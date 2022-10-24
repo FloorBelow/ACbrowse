@@ -7,6 +7,7 @@ using Force.Crc32;
 using Num = System.Numerics;
 using System.Collections.Generic;
 using System.Text;
+using System.Linq;
 
 namespace ImGuiNET.SampleProgram.XNA
 {
@@ -21,8 +22,10 @@ namespace ImGuiNET.SampleProgram.XNA
         private Texture2D _xnaTexture;
         private IntPtr _imGuiTexture;
 
-        Forge forge;
-        ForgeFile[][] files;
+        string[] forgenames;
+        string[] forgepaths;
+        Forge[] forges;
+        ForgeFile[][][] files;
         Dictionary<uint, string> fileTypes;
 
         public AcBrowserGame()
@@ -35,9 +38,14 @@ namespace ImGuiNET.SampleProgram.XNA
 
             IsMouseVisible = true;
 
-            forge = new Forge(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\DataPC.forge", Games.AC2);
-            files = new ForgeFile[forge.datafileTable.Length][];
-            for(int i = 0; i < forge.datafileTable.Length; i++) { files[i] = forge.OpenDatafile(i, null, false); }
+            forgepaths = Directory.EnumerateFiles(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II", "*.forge").ToArray<string>();
+            forgenames = new string[forgepaths.Length]; for(int i = 0; i < forgenames.Length; i++) forgenames[i] = Path.GetFileName(forgepaths[i]);
+            forges = new Forge[forgepaths.Length];
+            files = new ForgeFile[forgepaths.Length][][];
+
+            //forge = new Forge(@"E:\Games\Ubisoft Game Launcher\games\Assassin's Creed II\DataPC.forge", Games.AC2);
+            //files = new ForgeFile[forge.datafileTable.Length][];
+            //for(int i = 0; i < forge.datafileTable.Length; i++) { files[i] = forge.OpenDatafile(i, null, false); }
             fileTypes = new Dictionary<uint, string>();
             foreach(string line in File.ReadAllLines(@"F:\Extracted\AC\AC2FileTypes.txt")) {
                 byte[] hashbytes = Encoding.ASCII.GetBytes(line);
@@ -100,24 +108,38 @@ namespace ImGuiNET.SampleProgram.XNA
             // 1. Show a simple window
             // Tip: if we don't call ImGui.Begin()/ImGui.End() the widgets appears in a window automatically called "Debug"
             {
-                for (int i = 0; i < forge.datafileTable.Length; i++) {
-                    ImGui.Text("");
-                    if (files[i] is not null) {
-                        ImGui.BeginTable("files", 3);
-                        for(int file = 0; file < files[i].Length; file++) {
-                            ImGui.TableNextRow();
-                            if (fileTypes.ContainsKey(files[i][file].fileType)) {
-                                ImGui.TableSetColumnIndex(0);
-                                ImGui.Text(forge.datafileTable[i].name);
-                                ImGui.TableSetColumnIndex(1);
-                                ImGui.Text(fileTypes[files[i][file].fileType]);
-                                ImGui.TableSetColumnIndex(2);
-                                ImGui.Text(files[i][file].name);
+                for(int forge = 0; forge < forges.Length; forge++) {
+                    if (ImGui.TreeNode(forgenames[forge])) {
+                        if (forges[forge] is null) {
+                            forges[forge] = new Forge(forgepaths[forge], Games.ac2);
+                            files[forge] = new ForgeFile[forges[forge].datafileTable.Length][];
+                        }
+                        for (int dataFile = 0; dataFile < forges[forge].datafileTable.Length; dataFile++) {
+                            if (ImGui.TreeNode(forges[forge].datafileTable[dataFile].name)) {
+                                if (files[forge][dataFile] is null) files[forge][dataFile] = forges[forge].OpenDatafile(dataFile, null, false);
+                                ImGui.BeginTable("files", 2);
+                                ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed);
+                                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch);
+                                //ImGui.TableHeadersRow();
+                                for (int file = 0; file < files[forge][dataFile].Length; file++) {
+                                    ImGui.TableNextRow();
+                                    if (fileTypes.ContainsKey(files[forge][dataFile][file].fileType)) {
+                                        ImGui.TableSetColumnIndex(0);
+                                        ImGui.Text(fileTypes[files[forge][dataFile][file].fileType]);
+                                        ImGui.TableSetColumnIndex(1);
+                                        ImGui.Text(files[forge][dataFile][file].name);
+                                    }
+                                }
+                                ImGui.EndTable();
+                                ImGui.TreePop();
                             }
                         }
-                        ImGui.EndTable();
+                        ImGui.TreePop();
                     }
+
                 }
+
+
             }
 
 
